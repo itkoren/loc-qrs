@@ -67,19 +67,3 @@ linters:
           arguments:
             - disableStutteringCheck
 
-issues:
-  exclusions:
-    rules:
-      # Test files: relax errcheck and gocritic
-      - path: "_test\\.go"
-        linters:
-          - errcheck
-          - gocritic
-      # cmd/main.go uses sha256 import for suppression guard
-      - path: "cmd/server/main\\.go"
-        linters:
-          - unused
-      # MCP tools legitimately discard json.MarshalIndent error (result is always valid)
-      - path: "internal/mcp/tools\\.go"
-        linters:
-          - errcheck
