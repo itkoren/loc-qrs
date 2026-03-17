@@ -60,10 +60,6 @@ jobs:
             goos: darwin
             goarch: arm64
             suffix: darwin-arm64
-          - os: macos-13
-            goos: darwin
-            goarch: amd64
-            suffix: darwin-amd64
 
     steps:
       - uses: actions/checkout@v4
@@ -138,5 +134,4 @@ jobs:
             --notes-file RELEASE_NOTES.md \
             dist/server-linux-amd64 \
             dist/server-darwin-arm64 \
-            dist/server-darwin-amd64 \
             dist/checksums.txt
