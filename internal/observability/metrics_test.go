@@ -3,10 +3,11 @@ package observability_test
 import (
 	"testing"
 
-	"github.com/itkoren/loc-qrs/internal/observability"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/itkoren/loc-qrs/internal/observability"
 )
 
 func TestNewMetrics_AllNonNil(t *testing.T) {

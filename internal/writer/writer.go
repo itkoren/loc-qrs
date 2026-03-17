@@ -15,7 +15,7 @@ import (
 
 // Record is what flows through the ingest channel.
 type Record struct {
-	Payload    []byte    // pre-encoded line (includes \n)
+	Payload    []byte // pre-encoded line (includes \n)
 	IngestedAt time.Time
 }
 

@@ -11,8 +11,10 @@ import (
 type Format string
 
 const (
+	// FormatJSONL is the default newline-delimited JSON write format.
 	FormatJSONL Format = "jsonl"
-	FormatCSV   Format = "csv"
+	// FormatCSV is the comma-separated values write format.
+	FormatCSV Format = "csv"
 )
 
 // Config holds all runtime configuration.

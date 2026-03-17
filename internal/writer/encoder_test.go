@@ -4,10 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itkoren/loc-qrs/internal/schema"
-	"github.com/itkoren/loc-qrs/internal/writer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/itkoren/loc-qrs/internal/schema"
+	"github.com/itkoren/loc-qrs/internal/writer"
 )
 
 func TestJSONLEncoder(t *testing.T) {

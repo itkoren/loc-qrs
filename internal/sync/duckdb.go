@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -17,7 +18,7 @@ func OpenSyncDB(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("open sync duckdb %s: %w", path, err)
 	}
 	// DuckDB is embedded; ping to verify.
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(context.Background()); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("ping sync duckdb: %w", err)
 	}
@@ -34,7 +35,7 @@ func OpenQueryDB() (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open query duckdb: %w", err)
 	}
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(context.Background()); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("ping query duckdb: %w", err)
 	}
@@ -43,7 +44,7 @@ func OpenQueryDB() (*sql.DB, error) {
 
 // CopyToParquet converts a JSONL file to Parquet using DuckDB.
 // It writes to a .tmp file then atomically renames it.
-func CopyToParquet(db *sql.DB, srcJSONL, dstParquet string) error {
+func CopyToParquet(ctx context.Context, db *sql.DB, srcJSONL, dstParquet string) error {
 	tmpPath := dstParquet + ".tmp"
 
 	// Remove stale tmp file if any.
@@ -54,7 +55,7 @@ func CopyToParquet(db *sql.DB, srcJSONL, dstParquet string) error {
 		sqlQuote(srcJSONL),
 		sqlQuote(tmpPath),
 	)
-	if _, err := db.Exec(query); err != nil {
+	if _, err := db.ExecContext(ctx, query); err != nil {
 		return fmt.Errorf("copy to parquet: %w", err)
 	}
 
@@ -67,7 +68,7 @@ func CopyToParquet(db *sql.DB, srcJSONL, dstParquet string) error {
 }
 
 // CopyCSVToParquet converts a CSV file to Parquet.
-func CopyCSVToParquet(db *sql.DB, srcCSV, dstParquet string, header bool) error {
+func CopyCSVToParquet(ctx context.Context, db *sql.DB, srcCSV, dstParquet string, header bool) error {
 	tmpPath := dstParquet + ".tmp"
 	_ = os.Remove(tmpPath)
 
@@ -82,7 +83,7 @@ func CopyCSVToParquet(db *sql.DB, srcCSV, dstParquet string, header bool) error 
 		headerStr,
 		sqlQuote(tmpPath),
 	)
-	if _, err := db.Exec(query); err != nil {
+	if _, err := db.ExecContext(ctx, query); err != nil {
 		return fmt.Errorf("copy csv to parquet: %w", err)
 	}
 	if err := os.Rename(tmpPath, dstParquet); err != nil {

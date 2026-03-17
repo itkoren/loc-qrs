@@ -19,11 +19,11 @@ type QueryResult struct {
 
 // QueryEngine executes read-only queries against Parquet + live JSONL files.
 type QueryEngine struct {
-	db          *sql.DB
-	dataDir     string
-	fileWriter  interface{ CurrentFilePath() string }
-	metrics     *observability.Metrics
-	logger      *slog.Logger
+	db         *sql.DB
+	dataDir    string
+	fileWriter interface{ CurrentFilePath() string }
+	metrics    *observability.Metrics
+	logger     *slog.Logger
 }
 
 // NewQueryEngine creates a QueryEngine.

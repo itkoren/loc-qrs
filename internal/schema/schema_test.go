@@ -4,9 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itkoren/loc-qrs/internal/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/itkoren/loc-qrs/internal/schema"
 )
 
 // ── Parse ─────────────────────────────────────────────────────────────────────
@@ -75,15 +76,19 @@ func TestParse_VersionIsSHA256(t *testing.T) {
 }
 
 func TestParse_VersionChangesWithContent(t *testing.T) {
-	s1, _ := schema.Parse([]byte(`{"columns":{"id":"UBIGINT"}}`))
-	s2, _ := schema.Parse([]byte(`{"columns":{"id":"BIGINT"}}`))
+	s1, err := schema.Parse([]byte(`{"columns":{"id":"UBIGINT"}}`))
+	require.NoError(t, err)
+	s2, err := schema.Parse([]byte(`{"columns":{"id":"BIGINT"}}`))
+	require.NoError(t, err)
 	assert.NotEqual(t, s1.Version, s2.Version)
 }
 
 func TestParse_VersionStableForSameContent(t *testing.T) {
 	raw := `{"columns":{"id":"UBIGINT"}}`
-	s1, _ := schema.Parse([]byte(raw))
-	s2, _ := schema.Parse([]byte(raw))
+	s1, err := schema.Parse([]byte(raw))
+	require.NoError(t, err)
+	s2, err := schema.Parse([]byte(raw))
+	require.NoError(t, err)
 	assert.Equal(t, s1.Version, s2.Version)
 }
 

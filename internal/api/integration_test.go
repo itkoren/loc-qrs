@@ -14,17 +14,17 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/marcboeker/go-duckdb"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/itkoren/loc-qrs/internal/api"
 	"github.com/itkoren/loc-qrs/internal/observability"
 	"github.com/itkoren/loc-qrs/internal/query"
 	locSync "github.com/itkoren/loc-qrs/internal/sync"
 	"github.com/itkoren/loc-qrs/internal/testutil"
 	"github.com/itkoren/loc-qrs/internal/writer"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	_ "github.com/marcboeker/go-duckdb"
 )
 
 // fullStack wires up all real components using a temp directory.
@@ -85,10 +85,10 @@ func newFullStack(t *testing.T) *fullStack {
 
 	t.Cleanup(func() {
 		fw.Stop()
-		_ = sw.SyncNow(context.Background())
+		require.NoError(t, sw.SyncNow(context.Background()))
 		sw.Stop()
-		syncDB.Close()
-		queryDB.Close()
+		require.NoError(t, syncDB.Close())
+		require.NoError(t, queryDB.Close())
 	})
 
 	return &fullStack{router: router, fw: fw, sw: sw, syncDB: syncDB, queryDB: queryDB}
@@ -96,7 +96,7 @@ func newFullStack(t *testing.T) *fullStack {
 
 func (s *fullStack) post(t *testing.T, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, path,
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path,
 		bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -106,7 +106,7 @@ func (s *fullStack) post(t *testing.T, path, body string) *httptest.ResponseReco
 
 func (s *fullStack) get(t *testing.T, path string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, http.NoBody)
 	w := httptest.NewRecorder()
 	s.router.ServeHTTP(w, req)
 	return w
@@ -350,10 +350,13 @@ func TestIntegration_ConcurrentIngestion(t *testing.T) {
 			body := `{"record":{"id":` + strings.Repeat("1", 1) + `}}`
 			_ = body
 			// Each goroutine constructs a unique body.
-			b, _ := json.Marshal(map[string]any{
+			b, marshalErr := json.Marshal(map[string]any{
 				"record": map[string]any{"id": float64(i + 1), "event_name": "concurrent"},
 			})
-			req := httptest.NewRequest(http.MethodPost, "/api/v1/records", bytes.NewReader(b))
+			if marshalErr != nil {
+				return
+			}
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/records", bytes.NewReader(b))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 			s.router.ServeHTTP(w, req)

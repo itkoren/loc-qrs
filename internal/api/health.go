@@ -7,8 +7,8 @@ import (
 )
 
 type healthHandler struct {
-	db  *sql.DB
-	fw  interface {
+	db *sql.DB
+	fw interface {
 		ChannelLen() int
 		ChannelCap() int
 	}

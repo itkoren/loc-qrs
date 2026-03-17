@@ -3,8 +3,9 @@ package query_test
 import (
 	"testing"
 
-	"github.com/itkoren/loc-qrs/internal/query"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/itkoren/loc-qrs/internal/query"
 )
 
 // ── GuardSQL ──────────────────────────────────────────────────────────────────

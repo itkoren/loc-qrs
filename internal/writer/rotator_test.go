@@ -1,20 +1,20 @@
 package writer_test
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/itkoren/loc-qrs/internal/writer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/itkoren/loc-qrs/internal/writer"
 )
 
 func TestDailyRotator_FilePath(t *testing.T) {
 	r := writer.NewDailyRotator("/data", "jsonl")
 	path := r.FilePath("2026-03-17")
-	assert.Equal(t, filepath.Join("/data", "data_2026-03-17.jsonl"), path)
+	assert.Equal(t, "/data/data_2026-03-17.jsonl", path)
 }
 
 func TestDailyRotator_FilePath_CSV(t *testing.T) {

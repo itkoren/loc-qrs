@@ -3,14 +3,16 @@
 package sync_test
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
 
-	locSync "github.com/itkoren/loc-qrs/internal/sync"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	locSync "github.com/itkoren/loc-qrs/internal/sync"
 
 	_ "github.com/marcboeker/go-duckdb"
 )
@@ -20,14 +22,14 @@ func TestOpenSyncDB(t *testing.T) {
 	db, err := locSync.OpenSyncDB(filepath.Join(dir, ".sync.duckdb"))
 	require.NoError(t, err)
 	defer db.Close()
-	assert.NoError(t, db.Ping())
+	assert.NoError(t, db.PingContext(context.Background()))
 }
 
 func TestOpenQueryDB(t *testing.T) {
 	db, err := locSync.OpenQueryDB()
 	require.NoError(t, err)
 	defer db.Close()
-	assert.NoError(t, db.Ping())
+	assert.NoError(t, db.PingContext(context.Background()))
 }
 
 func TestCopyToParquet_RoundTrip(t *testing.T) {
@@ -47,7 +49,7 @@ func TestCopyToParquet_RoundTrip(t *testing.T) {
 
 	// Convert to Parquet.
 	parquetPath := filepath.Join(dir, "data_2026-03-17.parquet")
-	err = locSync.CopyToParquet(db, jsonlPath, parquetPath)
+	err = locSync.CopyToParquet(context.Background(), db, jsonlPath, parquetPath)
 	require.NoError(t, err)
 
 	// Verify Parquet file exists.
@@ -64,7 +66,8 @@ func TestCopyToParquet_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	defer queryDB.Close()
 
-	rows, err := queryDB.Query(`SELECT id, name, value FROM read_parquet('` + parquetPath + `') ORDER BY id`)
+	rows, err := queryDB.QueryContext(context.Background(),
+		`SELECT id, name, value FROM read_parquet('`+parquetPath+`') ORDER BY id`)
 	require.NoError(t, err)
 	defer rows.Close()
 
@@ -97,10 +100,11 @@ func TestCopyToParquet_EmptyFile(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	// Empty file should either succeed (empty parquet) or fail gracefully.
-	// DuckDB may return an error for completely empty JSONL.
-	_ = locSync.CopyToParquet(db, jsonlPath, filepath.Join(dir, "out.parquet"))
-	// We don't assert error here — the SyncWorker skips empty files before calling this.
+	// CopyToParquet on an empty JSONL may succeed or fail; the SyncWorker skips empty files
+	// before calling this in production. We only verify it doesn't panic.
+	if copyErr := locSync.CopyToParquet(context.Background(), db, jsonlPath, filepath.Join(dir, "out.parquet")); copyErr != nil {
+		t.Logf("empty-file CopyToParquet returned (acceptable): %v", copyErr)
+	}
 }
 
 func TestCopyCSVToParquet_RoundTrip(t *testing.T) {
@@ -115,7 +119,7 @@ func TestCopyCSVToParquet_RoundTrip(t *testing.T) {
 	defer db.Close()
 
 	parquetPath := filepath.Join(dir, "data_2026-03-17.parquet")
-	err = locSync.CopyCSVToParquet(db, csvPath, parquetPath, false)
+	err = locSync.CopyCSVToParquet(context.Background(), db, csvPath, parquetPath, false)
 	require.NoError(t, err)
 
 	info, err := os.Stat(parquetPath)
@@ -133,7 +137,7 @@ func TestCopyToParquet_AtomicRename(t *testing.T) {
 	defer db.Close()
 
 	parquetPath := filepath.Join(dir, "data.parquet")
-	require.NoError(t, locSync.CopyToParquet(db, jsonlPath, parquetPath))
+	require.NoError(t, locSync.CopyToParquet(context.Background(), db, jsonlPath, parquetPath))
 
 	// Final file exists.
 	_, err = os.Stat(parquetPath)

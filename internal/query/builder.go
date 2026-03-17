@@ -18,6 +18,7 @@ func BuildQuery(userSQL, dataDir, currentFile string) (string, error) {
 	liveDate := liveDateFromPath(currentFile)
 
 	// Find all parquet files, excluding the one matching the live file's date.
+	// filepath.Glob only errors on malformed patterns; the pattern here is a static constant.
 	allParquets, _ := filepath.Glob(filepath.Join(dataDir, "data_*.parquet"))
 	var historicalParquets []string
 	for _, p := range allParquets {

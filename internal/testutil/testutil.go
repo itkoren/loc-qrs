@@ -8,9 +8,10 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/itkoren/loc-qrs/internal/observability"
 	"github.com/itkoren/loc-qrs/internal/schema"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // DefaultSchemaJSON is a minimal schema suitable for most tests.

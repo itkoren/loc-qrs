@@ -18,7 +18,7 @@ func NewInMemoryDuckDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("NewInMemoryDuckDB open: %v", err)
 	}
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(t.Context()); err != nil {
 		db.Close()
 		t.Fatalf("NewInMemoryDuckDB ping: %v", err)
 	}
@@ -36,7 +36,7 @@ func NewTempSyncDB(t *testing.T) *sql.DB {
 		t.Fatalf("NewTempSyncDB open: %v", err)
 	}
 	db.SetMaxOpenConns(1)
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(t.Context()); err != nil {
 		db.Close()
 		t.Fatalf("NewTempSyncDB ping: %v", err)
 	}

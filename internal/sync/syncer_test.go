@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	locSync "github.com/itkoren/loc-qrs/internal/sync"
-	"github.com/itkoren/loc-qrs/internal/testutil"
-	"github.com/itkoren/loc-qrs/internal/writer"
+	_ "github.com/marcboeker/go-duckdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/marcboeker/go-duckdb"
+	locSync "github.com/itkoren/loc-qrs/internal/sync"
+	"github.com/itkoren/loc-qrs/internal/testutil"
+	"github.com/itkoren/loc-qrs/internal/writer"
 )
 
 // mockFlusher counts Flush() calls.
@@ -45,7 +45,7 @@ func newTestSyncWorker(t *testing.T) (*locSync.SyncWorker, *mockFlusher, chan st
 	db, err := sql.Open("duckdb", dbPath)
 	require.NoError(t, err)
 	db.SetMaxOpenConns(1)
-	require.NoError(t, db.Ping())
+	require.NoError(t, db.PingContext(context.Background()))
 	t.Cleanup(func() { db.Close() })
 
 	flusher := &mockFlusher{}

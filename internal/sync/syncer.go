@@ -181,7 +181,7 @@ func (sw *SyncWorker) syncAll(ctx context.Context) error {
 }
 
 // syncFile converts a single source file to Parquet.
-func (sw *SyncWorker) syncFile(_ context.Context, srcPath string) error {
+func (sw *SyncWorker) syncFile(ctx context.Context, srcPath string) error {
 	// Skip empty files.
 	info, err := os.Stat(srcPath)
 	if err != nil {
@@ -199,9 +199,9 @@ func (sw *SyncWorker) syncFile(_ context.Context, srcPath string) error {
 	ext := strings.ToLower(filepath.Ext(srcPath))
 	switch ext {
 	case ".jsonl":
-		return CopyToParquet(sw.db, srcPath, dstPath)
+		return CopyToParquet(ctx, sw.db, srcPath, dstPath)
 	case ".csv":
-		return CopyCSVToParquet(sw.db, srcPath, dstPath, false)
+		return CopyCSVToParquet(ctx, sw.db, srcPath, dstPath, false)
 	default:
 		return fmt.Errorf("unsupported source extension %q", ext)
 	}

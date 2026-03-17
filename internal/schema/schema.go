@@ -28,13 +28,6 @@ type Schema struct {
 	Format string
 }
 
-// raw is used only for JSON unmarshalling.
-type raw struct {
-	Columns map[string]string `json:"columns"`
-	Format  string            `json:"format"`
-	// columnOrder preserves insertion order via a separate key (Go maps are unordered).
-}
-
 // validTypes is the set of allowed DuckDB column types.
 var validTypes = map[string]bool{
 	"BOOLEAN": true, "TINYINT": true, "SMALLINT": true, "INTEGER": true,

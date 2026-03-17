@@ -8,13 +8,14 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
+
 	"github.com/itkoren/loc-qrs/internal/observability"
 	"github.com/itkoren/loc-qrs/internal/query"
 	"github.com/itkoren/loc-qrs/internal/schema"
-	"github.com/itkoren/loc-qrs/internal/writer"
 	mcpsyncer "github.com/itkoren/loc-qrs/internal/sync"
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
+	"github.com/itkoren/loc-qrs/internal/writer"
 )
 
 // Deps groups all service dependencies for MCP tool handlers.
@@ -123,7 +124,10 @@ func queryRecordsHandler(deps Deps) server.ToolHandlerFunc {
 			return mcp.NewToolResultError(fmt.Sprintf("query error: %v", err)), nil
 		}
 
-		b, _ := json.MarshalIndent(result, "", "  ")
+		b, err := json.MarshalIndent(result, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("marshal error: %v", err)), nil
+		}
 		return mcp.NewToolResultText(string(b)), nil
 	}
 }
@@ -136,7 +140,10 @@ func getSchemaHandler(deps Deps) server.ToolHandlerFunc {
 			"columns": deps.Schema.Columns,
 			"ordered": deps.Schema.ColumnNames(),
 		}
-		b, _ := json.MarshalIndent(out, "", "  ")
+		b, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("marshal error: %v", err)), nil
+		}
 		return mcp.NewToolResultText(string(b)), nil
 	}
 }
@@ -147,16 +154,19 @@ func listFilesHandler(deps Deps) server.ToolHandlerFunc {
 		var files []map[string]any
 
 		for _, pat := range patterns {
-			matches, _ := filepath.Glob(filepath.Join(deps.DataDir, pat))
+			matches, err := filepath.Glob(filepath.Join(deps.DataDir, pat))
+			if err != nil {
+				continue
+			}
 			for _, m := range matches {
 				info, err := os.Stat(m)
 				if err != nil {
 					continue
 				}
 				files = append(files, map[string]any{
-					"path":         m,
-					"size_bytes":   info.Size(),
-					"modified":     info.ModTime().UTC().Format(time.RFC3339),
+					"path":       m,
+					"size_bytes": info.Size(),
+					"modified":   info.ModTime().UTC().Format(time.RFC3339),
 				})
 			}
 		}
@@ -164,7 +174,10 @@ func listFilesHandler(deps Deps) server.ToolHandlerFunc {
 		if files == nil {
 			files = []map[string]any{}
 		}
-		b, _ := json.MarshalIndent(files, "", "  ")
+		b, err := json.MarshalIndent(files, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("marshal error: %v", err)), nil
+		}
 		return mcp.NewToolResultText(string(b)), nil
 	}
 }
@@ -197,7 +210,10 @@ func getHealthHandler(deps Deps) server.ToolHandlerFunc {
 			"status":           "ok",
 			"channel_fill_pct": fillPct,
 		}
-		b, _ := json.MarshalIndent(out, "", "  ")
+		b, err := json.MarshalIndent(out, "", "  ")
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("marshal error: %v", err)), nil
+		}
 		return mcp.NewToolResultText(string(b)), nil
 	}
 }

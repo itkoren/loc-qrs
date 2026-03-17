@@ -6,9 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/itkoren/loc-qrs/internal/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/itkoren/loc-qrs/internal/query"
 )
 
 func TestBuildQuery_NoFiles(t *testing.T) {

@@ -8,12 +8,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/itkoren/loc-qrs/internal/observability"
 	"github.com/itkoren/loc-qrs/internal/query"
 	"github.com/itkoren/loc-qrs/internal/schema"
 	"github.com/itkoren/loc-qrs/internal/writer"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Syncer is the interface required by the sync and rebuild HTTP handlers.

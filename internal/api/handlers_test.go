@@ -10,21 +10,21 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/marcboeker/go-duckdb"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/itkoren/loc-qrs/internal/api"
 	"github.com/itkoren/loc-qrs/internal/query"
 	"github.com/itkoren/loc-qrs/internal/testutil"
 	"github.com/itkoren/loc-qrs/internal/writer"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	_ "github.com/marcboeker/go-duckdb"
 )
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // mockSyncer implements the syncer interface expected by syncHandler and rebuildHandler.
 type mockSyncer struct {
-	syncErr   error
+	syncErr    error
 	rebuildErr error
 	syncCalls  int
 }
@@ -37,17 +37,6 @@ func (m *mockSyncer) SyncNow(_ context.Context) error {
 func (m *mockSyncer) RebuildAll(_ context.Context) error {
 	return m.rebuildErr
 }
-
-// mockFileWriter implements the channel interface for ingest and health checks.
-type mockFileWriter struct {
-	submitResult bool
-	channelLen   int
-	channelCap   int
-}
-
-func (m *mockFileWriter) Submit(_ writer.Record) bool { return m.submitResult }
-func (m *mockFileWriter) ChannelLen() int             { return m.channelLen }
-func (m *mockFileWriter) ChannelCap() int             { return m.channelCap }
 
 // newTestRouter creates a router with real in-memory DuckDB and a mock syncer.
 // FileWriter is nil (no ingestion in these tests; use newRouterWithRealWriter for that).
@@ -76,7 +65,7 @@ func newTestRouter(t *testing.T, _ bool) (http.Handler, *mockSyncer) {
 
 func postJSON(t *testing.T, handler http.Handler, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -85,7 +74,7 @@ func postJSON(t *testing.T, handler http.Handler, path, body string) *httptest.R
 
 func getReq(t *testing.T, handler http.Handler, path string) *httptest.ResponseRecorder {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, path, http.NoBody)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 	return w
@@ -128,7 +117,8 @@ func TestSyncHandler_Error(t *testing.T) {
 	// We need a router with a failing syncer.
 	dir := t.TempDir()
 	sch := testutil.MustParseSchema(t, testutil.DefaultSchemaJSON)
-	enc, _ := writer.NewEncoder("jsonl")
+	enc, err := writer.NewEncoder("jsonl")
+	require.NoError(t, err)
 	db, err := sql.Open("duckdb", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
@@ -204,7 +194,7 @@ func TestMetricsEndpoint_Returns200(t *testing.T) {
 
 func TestMiddleware_RequestID_Generated(t *testing.T) {
 	router, _ := newTestRouter(t, true)
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/health", http.NoBody)
 	// No X-Request-ID header.
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -215,7 +205,7 @@ func TestMiddleware_RequestID_Generated(t *testing.T) {
 
 func TestMiddleware_RequestID_Preserved(t *testing.T) {
 	router, _ := newTestRouter(t, true)
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/health", http.NoBody)
 	req.Header.Set("X-Request-ID", "my-custom-id")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -234,7 +224,7 @@ func TestMiddleware_Recover_Panic(t *testing.T) {
 	logger := testutil.NewTestLogger()
 	handler := api.Recover(logger)(mux)
 
-	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/panic", http.NoBody)
 	w := httptest.NewRecorder()
 
 	assert.NotPanics(t, func() {
@@ -250,7 +240,8 @@ func newRouterWithRealWriter(t *testing.T, channelCap int) (http.Handler, *write
 	t.Helper()
 	dir := t.TempDir()
 	sch := testutil.MustParseSchema(t, testutil.DefaultSchemaJSON)
-	enc, _ := writer.NewEncoder("jsonl")
+	enc, err := writer.NewEncoder("jsonl")
+	require.NoError(t, err)
 	metrics := testutil.NewTestMetrics(t)
 	logger := testutil.NewTestLogger()
 
@@ -395,10 +386,10 @@ func TestAllHandlers_ContentTypeJSON(t *testing.T) {
 		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
 			var req *http.Request
 			if tc.body != "" {
-				req = httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+				req = httptest.NewRequestWithContext(context.Background(), tc.method, tc.path, strings.NewReader(tc.body))
 				req.Header.Set("Content-Type", "application/json")
 			} else {
-				req = httptest.NewRequest(tc.method, tc.path, nil)
+				req = httptest.NewRequestWithContext(context.Background(), tc.method, tc.path, http.NoBody)
 			}
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
@@ -426,10 +417,10 @@ func TestAllHandlers_ValidJSONResponse(t *testing.T) {
 		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
 			var req *http.Request
 			if tc.body != "" {
-				req = httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+				req = httptest.NewRequestWithContext(context.Background(), tc.method, tc.path, strings.NewReader(tc.body))
 				req.Header.Set("Content-Type", "application/json")
 			} else {
-				req = httptest.NewRequest(tc.method, tc.path, nil)
+				req = httptest.NewRequestWithContext(context.Background(), tc.method, tc.path, http.NoBody)
 			}
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
@@ -449,8 +440,8 @@ func TestQueryHandler_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/query",
-		strings.NewReader(`{"sql":"SELECT 1"}`)).WithContext(ctx)
+	req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/v1/query",
+		strings.NewReader(`{"sql":"SELECT 1"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)

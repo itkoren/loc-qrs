@@ -7,14 +7,14 @@ import (
 
 // Metrics holds all Prometheus metric instances.
 type Metrics struct {
-	RecordsIngested      prometheus.Counter
-	RecordsRejected      *prometheus.CounterVec
+	RecordsIngested       prometheus.Counter
+	RecordsRejected       *prometheus.CounterVec
 	IngestionChannelDepth prometheus.Gauge
-	ParquetSyncDuration  prometheus.Histogram
-	SyncFailures         prometheus.Counter
-	QueryLatency         prometheus.Histogram
-	QueryErrors          *prometheus.CounterVec
-	ActiveSyncs          prometheus.Gauge
+	ParquetSyncDuration   prometheus.Histogram
+	SyncFailures          prometheus.Counter
+	QueryLatency          prometheus.Histogram
+	QueryErrors           *prometheus.CounterVec
+	ActiveSyncs           prometheus.Gauge
 }
 
 // NewMetrics registers and returns all metrics.

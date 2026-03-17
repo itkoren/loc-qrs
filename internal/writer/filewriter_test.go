@@ -8,11 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/itkoren/loc-qrs/internal/schema"
 	"github.com/itkoren/loc-qrs/internal/testutil"
 	"github.com/itkoren/loc-qrs/internal/writer"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // newTestWriter creates a FileWriter backed by a temp directory and starts it.
@@ -137,7 +138,8 @@ func TestFileWriter_WritesToDisk(t *testing.T) {
 func TestFileWriter_SyncTrigger_FiresAtCount(t *testing.T) {
 	dir := t.TempDir()
 	sch := testutil.MustParseSchema(t, testutil.DefaultSchemaJSON)
-	enc, _ := writer.NewEncoder("jsonl")
+	enc, err := writer.NewEncoder("jsonl")
+	require.NoError(t, err)
 
 	ch := make(chan writer.Record, 100)
 	syncTriggerCh := make(chan struct{}, 1)
@@ -174,7 +176,7 @@ func TestFileWriter_CurrentFilePath(t *testing.T) {
 	path := fw.CurrentFilePath()
 	today := writer.CurrentDate()
 	assert.Contains(t, path, today)
-	assert.True(t, filepath.IsAbs(path) || len(path) > 0)
+	assert.True(t, filepath.IsAbs(path) || path != "")
 }
 
 // bytesReader wraps []byte as an io.Reader for bufio.Scanner.
@@ -198,7 +200,8 @@ func bytesReader(b []byte) *bytesReaderHelper {
 
 // TestEncoder_JSON tests the JSONLEncoder via schema-aware encoding.
 func TestEncoder_JSONL_SchemaFields(t *testing.T) {
-	sch, _ := schema.Parse([]byte(`{"columns":{"id":"UBIGINT","name":"VARCHAR"}}`))
+	sch, err := schema.Parse([]byte(`{"columns":{"id":"UBIGINT","name":"VARCHAR"}}`))
+	require.NoError(t, err)
 	enc := &writer.JSONLEncoder{}
 	b, err := enc.Encode(map[string]any{"id": float64(99), "name": "hello"}, sch)
 	require.NoError(t, err)

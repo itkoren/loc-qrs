@@ -7,12 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/itkoren/loc-qrs/internal/observability"
 )
-
-type contextKey string
-
-const requestIDKey contextKey = "request_id"
 
 // RequestID middleware injects a unique request ID into the request context and response header.
 func RequestID(next http.Handler) http.Handler {
@@ -22,9 +19,6 @@ func RequestID(next http.Handler) http.Handler {
 			id = uuid.New().String()
 		}
 		w.Header().Set("X-Request-ID", id)
-		ctx := r.Context()
-		// Store in context via value key — accessible via r.Context().Value(requestIDKey).
-		_ = ctx
 		next.ServeHTTP(w, r)
 	})
 }

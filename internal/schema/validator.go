@@ -60,39 +60,9 @@ func validateValue(field string, typ ColumnType, val any) *ValidationError {
 			return fail("expected boolean")
 		}
 	case "TINYINT", "SMALLINT", "INTEGER", "BIGINT", "UBIGINT", "HUGEINT", "UINTEGER":
-		switch v := val.(type) {
-		case float64:
-			if v != math.Trunc(v) {
-				return fail(fmt.Sprintf("expected integer, got %v", v))
-			}
-			if typ == "UBIGINT" || typ == "UINTEGER" {
-				if v < 0 {
-					return fail("expected unsigned integer, got negative value")
-				}
-			}
-		case json.Number:
-			if _, err := strconv.ParseInt(v.String(), 10, 64); err != nil {
-				if _, err2 := strconv.ParseUint(v.String(), 10, 64); err2 != nil {
-					return fail("expected integer number")
-				}
-			}
-		case string:
-			// Allow numeric strings for flexibility.
-			if _, err := strconv.ParseInt(v, 10, 64); err != nil {
-				if _, err2 := strconv.ParseUint(v, 10, 64); err2 != nil {
-					return fail("expected integer, got non-numeric string")
-				}
-			}
-		default:
-			return fail(fmt.Sprintf("expected integer type, got %T", val))
-		}
+		return validateInteger(field, typ, val)
 	case "FLOAT", "DOUBLE":
-		switch val.(type) {
-		case float64, json.Number:
-			// ok
-		default:
-			return fail(fmt.Sprintf("expected float, got %T", val))
-		}
+		return validateFloat(field, val)
 	case "VARCHAR", "TEXT", "BLOB", "UUID", "JSON":
 		if _, ok := val.(string); !ok {
 			return fail(fmt.Sprintf("expected string, got %T", val))
@@ -105,3 +75,47 @@ func validateValue(field string, typ ColumnType, val any) *ValidationError {
 	return nil
 }
 
+// validateInteger validates integer column types.
+func validateInteger(field string, typ ColumnType, val any) *ValidationError {
+	fail := func(msg string) *ValidationError {
+		return &ValidationError{Field: field, Message: msg}
+	}
+	switch v := val.(type) {
+	case float64:
+		if v != math.Trunc(v) {
+			return fail(fmt.Sprintf("expected integer, got %v", v))
+		}
+		if typ == "UBIGINT" || typ == "UINTEGER" {
+			if v < 0 {
+				return fail("expected unsigned integer, got negative value")
+			}
+		}
+	case json.Number:
+		if _, err := strconv.ParseInt(v.String(), 10, 64); err != nil {
+			if _, err2 := strconv.ParseUint(v.String(), 10, 64); err2 != nil {
+				return fail("expected integer number")
+			}
+		}
+	case string:
+		// Allow numeric strings for flexibility.
+		if _, err := strconv.ParseInt(v, 10, 64); err != nil {
+			if _, err2 := strconv.ParseUint(v, 10, 64); err2 != nil {
+				return fail("expected integer, got non-numeric string")
+			}
+		}
+	default:
+		return fail(fmt.Sprintf("expected integer type, got %T", val))
+	}
+	return nil
+}
+
+// validateFloat validates float column types.
+func validateFloat(field string, val any) *ValidationError {
+	switch val.(type) {
+	case float64, json.Number:
+		// ok
+	default:
+		return &ValidationError{Field: field, Message: fmt.Sprintf("expected float, got %T", val)}
+	}
+	return nil
+}

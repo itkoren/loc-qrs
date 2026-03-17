@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -33,6 +34,8 @@ func main() {
 }
 
 func run(cfg *config.Config, logger *slog.Logger) error {
+	logger.Info("starting loc-qrs", "version", version)
+
 	// --- Schema ---
 	sch, err := schema.Load(cfg.SchemaPath)
 	if err != nil {
@@ -41,13 +44,13 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 	logger.Info("schema loaded", "version", sch.Version[:8], "columns", len(sch.Columns))
 
 	// Schema version check.
-	if err := checkSchemaVersion(cfg.DataDir, sch.Version, cfg.Rebuild); err != nil {
-		return err
+	if schemaErr := checkSchemaVersion(cfg.DataDir, sch.Version, cfg.Rebuild); schemaErr != nil {
+		return schemaErr
 	}
 
 	// Ensure data directory exists.
-	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
-		return fmt.Errorf("create data dir: %w", err)
+	if dirErr := os.MkdirAll(cfg.DataDir, 0o755); dirErr != nil {
+		return fmt.Errorf("create data dir: %w", dirErr)
 	}
 
 	// --- Metrics ---
@@ -83,16 +86,9 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 	)
 
 	// --- DuckDB instances ---
-	syncDBPath := filepath.Join(cfg.DataDir, ".sync.duckdb")
-	syncDB, err := locSync.OpenSyncDB(syncDBPath)
+	syncDB, queryDB, err := openDatabases(cfg)
 	if err != nil {
-		return fmt.Errorf("open sync duckdb: %w", err)
-	}
-
-	queryDB, err := locSync.OpenQueryDB()
-	if err != nil {
-		syncDB.Close()
-		return fmt.Errorf("open query duckdb: %w", err)
+		return err
 	}
 
 	// --- Sync Worker ---
@@ -177,16 +173,20 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 	}
 
 	// Start HTTP server.
-	httpErrCh := make(chan error, 1)
-	go func() {
-		logger.Info("HTTP server listening", "addr", cfg.HTTPAddr)
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			httpErrCh <- fmt.Errorf("HTTP server: %w", err)
-		}
-		close(httpErrCh)
-	}()
+	httpErrCh := startHTTPServer(httpSrv, logger)
 
-	// Wait for shutdown signal or HTTP server failure.
+	waitForShutdown(ctx, cancel, sigCh, httpErrCh, logger)
+	return orderedShutdown(ctx, cfg, httpSrv, fw, sw, mcpSrv, syncDB, queryDB, logger)
+}
+
+// waitForShutdown blocks until a shutdown signal, HTTP error, or context cancellation.
+func waitForShutdown(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	sigCh <-chan os.Signal,
+	httpErrCh <-chan error,
+	logger *slog.Logger,
+) {
 	select {
 	case sig := <-sigCh:
 		logger.Info("received signal", "signal", sig)
@@ -198,8 +198,6 @@ func run(cfg *config.Config, logger *slog.Logger) error {
 		cancel()
 	case <-ctx.Done():
 	}
-
-	return orderedShutdown(ctx, cfg, httpSrv, fw, sw, mcpSrv, syncDB, queryDB, logger)
 }
 
 // orderedShutdown performs the graceful shutdown sequence.
@@ -253,13 +251,45 @@ func orderedShutdown(
 	return nil
 }
 
+// openDatabases opens both DuckDB instances required by the server.
+func openDatabases(cfg *config.Config) (syncDB, queryDB *sql.DB, err error) {
+	syncDBPath := filepath.Join(cfg.DataDir, ".sync.duckdb")
+	syncDB, err = locSync.OpenSyncDB(syncDBPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open sync duckdb: %w", err)
+	}
+	queryDB, err = locSync.OpenQueryDB()
+	if err != nil {
+		if closeErr := syncDB.Close(); closeErr != nil {
+			slog.Default().Warn("close syncDB on open error", "error", closeErr)
+		}
+		return nil, nil, fmt.Errorf("open query duckdb: %w", err)
+	}
+	return syncDB, queryDB, nil
+}
+
+// startHTTPServer launches the HTTP server in a goroutine and returns an error channel.
+func startHTTPServer(srv *http.Server, logger *slog.Logger) <-chan error {
+	errCh := make(chan error, 1)
+	go func() {
+		logger.Info("HTTP server listening", "addr", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- fmt.Errorf("HTTP server: %w", err)
+		}
+		close(errCh)
+	}()
+	return errCh
+}
+
 // checkSchemaVersion reads or writes the schema version file.
 // If the version has changed and --rebuild was not passed, it returns an error.
 func checkSchemaVersion(dataDir, version string, rebuild bool) error {
 	versionFile := filepath.Join(dataDir, ".schema_version")
 
 	// Ensure data directory exists for version file.
-	_ = os.MkdirAll(dataDir, 0o755)
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		return fmt.Errorf("create data dir for version file: %w", err)
+	}
 
 	stored, err := os.ReadFile(versionFile)
 	if err != nil {
@@ -283,8 +313,7 @@ func checkSchemaVersion(dataDir, version string, rebuild bool) error {
 	}
 
 	// Update version after rebuild.
-	_ = os.WriteFile(versionFile, []byte(version), 0o644)
-	return nil
+	return os.WriteFile(versionFile, []byte(version), 0o644)
 }
 
 // suppress unused import
