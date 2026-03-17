@@ -1,0 +1,10 @@
+{
+  "columns": {
+    "id": "UBIGINT",
+    "event_name": "VARCHAR",
+    "timestamp": "TIMESTAMP",
+    "value": "DOUBLE",
+    "metadata": "VARCHAR"
+  },
+  "format": "jsonl"
+}

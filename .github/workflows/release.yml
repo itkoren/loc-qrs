@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Quality gate ──────────────────────────────────────────────────────────
+  quality:
+    name: Quality (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: Install C compiler (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y gcc
+
+      - name: golangci-lint (Linux only)
+        if: runner.os == 'Linux'
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.61.0
+          args: --timeout=5m
+
+      - name: Unit tests
+        run: CGO_ENABLED=1 go test ./... -race -count=1 -timeout=120s
+
+      - name: Integration tests
+        run: CGO_ENABLED=1 go test ./... -race -count=1 -timeout=180s -tags=integration
+
+  # ── Platform builds ───────────────────────────────────────────────────────
+  build:
+    name: Build ${{ matrix.suffix }}
+    needs: [quality]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            suffix: darwin-arm64
+          - os: macos-13
+            goos: darwin
+            goarch: amd64
+            suffix: darwin-amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: Install C compiler (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y gcc
+
+      - name: Build
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p dist
+          go build \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o dist/server-${{ matrix.suffix }} \
+            ./cmd/server
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.suffix }}
+          path: dist/server-${{ matrix.suffix }}
+          if-no-files-found: error
+
+  # ── Create GitHub release ─────────────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la dist/
+
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum server-* > checksums.txt && cat checksums.txt
+
+      - name: Read release notes
+        id: notes
+        run: |
+          if [ -f RELEASE_NOTES.md ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "# Release ${{ github.ref_name }}" > RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            echo "No release notes provided. See commits for changes." >> RELEASE_NOTES.md
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "Release ${{ github.ref_name }}" \
+            --notes-file RELEASE_NOTES.md \
+            dist/server-linux-amd64 \
+            dist/server-darwin-arm64 \
+            dist/server-darwin-amd64 \
+            dist/checksums.txt

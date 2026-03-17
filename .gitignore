@@ -1,0 +1,48 @@
+# Compiled binaries
+bin/
+dist/
+
+# Runtime data (generated at runtime, not source)
+data/
+
+# Test artifacts
+coverage.out
+coverage.html
+
+# Temporary files
+*.tmp
+*.tmp.parquet
+
+# Release notes (generated per release, committed intentionally before tagging)
+# RELEASE_NOTES.md is committed manually as part of the release workflow
+
+# macOS
+.DS_Store
+.AppleDouble
+._*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Go tool cache
+vendor/
+
+# Reports (generated analysis output)
+reports/
+
+# Claude Code project memory bank — not part of the public source
+# These files are kept locally but excluded from version control
+CLAUDE.md
+CLAUDE-*.md
+.claude/
+
+# Gemini-specific context (not part of this project)
+GEMINI.md
+
+# Tool-specific rule files
+.clinerules
+.worktreeinclude
