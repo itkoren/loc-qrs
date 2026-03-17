@@ -1,18 +1,27 @@
+version: "2"
+
 run:
-  go: "1.24"
   timeout: 5m
   build-tags:
     - integration
 
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/itkoren/loc-qrs
+
 linters:
+  default: none
   enable:
     - bodyclose
     - cyclop
     - errcheck
     - exhaustive
     - gocritic
-    - gofmt
-    - goimports
     - govet
     - ineffassign
     - misspell
@@ -20,63 +29,57 @@ linters:
     - revive
     - staticcheck
     - unused
-  disable:
-    - exhaustruct
-    - godot
-    - gomnd
-    - nlreturn
-    - wsl
 
-linters-settings:
-  cyclop:
-    max-complexity: 15
+  settings:
+    cyclop:
+      max-complexity: 15
 
-  exhaustive:
-    default-signifies-exhaustive: true
+    exhaustive:
+      default-signifies-exhaustive: true
 
-  goimports:
-    local-prefixes: github.com/itkoren/loc-qrs
+    govet:
+      enable:
+        - shadow
 
-  govet:
-    enable:
-      - shadow
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - hugeParam       # Schema is passed by pointer everywhere
+        - unnamedResult   # single return values are intentionally unnamed
 
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - hugeParam          # Schema is passed by pointer everywhere
-      - unnamedResult      # single return values are intentionally unnamed
+    errcheck:
+      check-blank: true
+      exclude-functions:
+        - (net/http.ResponseWriter).Write
+        - (*encoding/json.Encoder).Encode
+        - os.Remove
+        - (*os.File).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.DB).Close
+        - path/filepath.Glob
 
-  errcheck:
-    check-blank: true
-    exclude-functions:
-      - (net/http.ResponseWriter).Write
-      - (*encoding/json.Encoder).Encode
-      - os.Remove
-      - (*os.File).Close
-      - (*database/sql.Rows).Close
-
-  revive:
-    rules:
-      - name: exported
-        arguments:
-          - disableStutteringCheck
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
 
 issues:
-  exclude-rules:
-    # Test files: relax errcheck and security checks
-    - path: "_test\\.go"
-      linters:
-        - errcheck
-        - gocritic
-    # cmd/main.go uses sha256 import for suppression guard
-    - path: "cmd/server/main\\.go"
-      linters:
-        - unused
-    # MCP tools legitimately discard json.MarshalIndent error (result is always valid)
-    - path: "internal/mcp/tools\\.go"
-      linters:
-        - errcheck
+  exclusions:
+    rules:
+      # Test files: relax errcheck and gocritic
+      - path: "_test\\.go"
+        linters:
+          - errcheck
+          - gocritic
+      # cmd/main.go uses sha256 import for suppression guard
+      - path: "cmd/server/main\\.go"
+        linters:
+          - unused
+      # MCP tools legitimately discard json.MarshalIndent error (result is always valid)
+      - path: "internal/mcp/tools\\.go"
+        linters:
+          - errcheck
